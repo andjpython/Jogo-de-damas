@@ -143,6 +143,75 @@ python dama.py
 http://localhost:5000
 ```
 
+## ☁️ Deploy no Render
+
+### Opção 1: Deploy Automático via GitHub
+
+1. **Faça push do código para o GitHub**
+```bash
+git add .
+git commit -m "Preparado para deploy"
+git push origin main
+```
+
+2. **Acesse [Render.com](https://render.com)** e faça login
+
+3. **Crie um novo Web Service**
+   - Clique em "New +" → "Web Service"
+   - Conecte seu repositório GitHub
+   - Selecione o repositório `Jogo-de-damas`
+
+4. **Configure o serviço**
+   - **Name**: `jogo-de-dama` (ou o nome que preferir)
+   - **Environment**: `Python 3`
+   - **Build Command**: `pip install -r requirements.txt`
+   - **Start Command**: `gunicorn dama:app`
+   - **Plan**: Free (ou pago se preferir)
+
+5. **Variáveis de Ambiente** (opcional)
+   - `PYTHON_VERSION`: `3.11.0`
+   - `FLASK_ENV`: `production`
+
+6. **Clique em "Create Web Service"**
+   - Render vai fazer o build e deploy automaticamente
+   - Aguarde alguns minutos
+
+7. **Acesse sua aplicação**
+   - Render fornecerá uma URL como: `https://jogo-de-dama.onrender.com`
+
+### Opção 2: Deploy via Render.yaml
+
+1. **O arquivo `render.yaml` já está configurado!**
+
+2. **No Render Dashboard**
+   - Clique em "New +" → "Blueprint"
+   - Conecte seu repositório
+   - Render detectará automaticamente o `render.yaml`
+   - Clique em "Apply"
+
+### 📝 Arquivos de Configuração
+
+O projeto já inclui todos os arquivos necessários:
+- ✅ `render.yaml` - Configuração do Render
+- ✅ `Procfile` - Comando de inicialização
+- ✅ `requirements.txt` - Dependências Python
+- ✅ `runtime.txt` - Versão do Python
+- ✅ `.gitignore` - Arquivos ignorados
+
+### 🔧 Troubleshooting
+
+**Erro de porta:**
+- O código já está configurado para usar `$PORT` do Render
+- Não precisa alterar nada!
+
+**Erro de build:**
+- Verifique se todas as dependências estão no `requirements.txt`
+- Certifique-se que o Python 3.11 está especificado
+
+**Erro de static files:**
+- O Flask já está configurado para servir arquivos estáticos
+- Certifique-se que a pasta `static/` está no repositório
+
 ## 🎮 Como Usar
 
 ### Iniciar Jogo

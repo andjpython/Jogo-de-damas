@@ -472,6 +472,10 @@ def reset_game():
     return jsonify({"status": "success", "game_state": game.get_state()})
 
 if __name__ == '__main__':
+    import os
+    port = int(os.environ.get('PORT', 5000))
+    debug = os.environ.get('FLASK_ENV') == 'development'
+    
     print("🎮 Servidor iniciando...")
     print("📁 Estrutura do projeto:")
     print("   ├── dama.py (Backend)")
@@ -483,7 +487,7 @@ if __name__ == '__main__':
     print("       └── imagens/")
     print("           ├── peça_black_dama.jpg")
     print("           └── peças_red_dama.jpg")
-    print("\n🚀 Acesse: http://192.168.0.10:5000")
+    print(f"\n🚀 Servidor rodando na porta: {port}")
     print("=" * 50)
     
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=debug, host='0.0.0.0', port=port)
