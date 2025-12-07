@@ -72,7 +72,7 @@ class CheckersGame:
         return sum(times) / len(times) if times else 0
 
     def analyze_time_comparison(self, move_time):
-        """Analisa tempo comparativo e aplica regras."""
+        """Analisa tempo comparativo (apenas avisos, sem penalidade)."""
         if self.turn == P1:
             self.player1_times.append(move_time)
         else:
@@ -85,44 +85,26 @@ class CheckersGame:
         avg2 = self.get_average_time(P2)
         
         message = None
-        penalty = False
 
+        # Apenas avisos informativos, SEM remover peças
         if avg1 > 0 and avg2 > 0:
             if avg1 > avg2 * 1.5 and self.turn == P1:
                 self.player1_warnings += 1
                 if self.player1_warnings >= 3:
-                    message = f"⚠️ {self.player1_name} está demorando MUITO! Penalidade aplicada!"
-                    penalty = True
+                    message = f"⚠️ {self.player1_name}, você está demorando muito! Agilize!"
                     self.player1_warnings = 0
                 else:
-                    message = f"⚠️ {self.player1_name}, você está demorando mais que {self.player2_name}! Agilize!"
+                    message = f"💡 {self.player1_name}, tente jogar mais rápido!"
             
             elif avg2 > avg1 * 1.5 and self.turn == P2:
                 self.player2_warnings += 1
                 if self.player2_warnings >= 3:
-                    message = f"⚠️ {self.player2_name} está demorando MUITO! Penalidade aplicada!"
-                    penalty = True
+                    message = f"⚠️ {self.player2_name}, você está demorando muito! Agilize!"
                     self.player2_warnings = 0
                 else:
-                    message = f"⚠️ {self.player2_name}, você está demorando mais que {self.player1_name}! Agilize!"
+                    message = f"💡 {self.player2_name}, tente jogar mais rápido!"
 
-        return {"message": message, "penalty": penalty}
-
-    def apply_time_penalty(self):
-        """Remove uma peça aleatória como penalidade."""
-        player_pieces = []
-        target = P1 if self.turn == P1 else P2
-        
-        for row in range(8):
-            for col in range(8):
-                if self.board[row][col] in [target, target + 2]:
-                    player_pieces.append((row, col))
-        
-        if player_pieces:
-            row, col = random.choice(player_pieces)
-            self.board[row][col] = EMPTY
-            return True
-        return False
+        return {"message": message}
 
     def is_piece_of_player(self, piece, player):
         """Verifica se peça pertence ao jogador."""
@@ -352,25 +334,38 @@ class CheckersGame:
             return False, message, None
 
         piece = self.board[start_r][start_c]
+        
+        # Verificar se é uma captura (antes de mover a peça)
+        captured = False
+        captured_pos = None
+        
+        # Buscar nas capturas possíveis para encontrar a posição da peça capturada
+        captures = self.get_captures(start_r, start_c)
+        for cap_end_r, cap_end_c, enemy_r, enemy_c in captures:
+            if cap_end_r == end_r and cap_end_c == end_c:
+                captured = True
+                captured_pos = (enemy_r, enemy_c)
+                break
+        
+        # Mover a peça
         self.board[end_r][end_c] = piece
         self.board[start_r][start_c] = EMPTY
         
-        row_diff = abs(end_r - start_r)
-        captured = False
-        if row_diff == 2:
-            mid_row = (start_r + end_r) // 2
-            mid_col = (start_c + end_c) // 2
-            self.board[mid_row][mid_col] = EMPTY
-            captured = True
+        # Remover a peça capturada (funciona para peças normais E damas)
+        if captured and captured_pos:
+            enemy_r, enemy_c = captured_pos
+            self.board[enemy_r][enemy_c] = EMPTY
         
+        # Promover a dama se chegou no final
         promoted = self.promote_to_king(end_r, end_c)
         
+        # Análise de tempo (SEM PENALIDADE DE PERDER PEÇA)
         time_analysis = None
         if move_time > 0:
             time_analysis = self.analyze_time_comparison(move_time)
-            if time_analysis and time_analysis["penalty"]:
-                self.apply_time_penalty()
+            # REMOVIDO: apply_time_penalty() - era confuso e bugado
         
+        # Verificar se pode capturar novamente
         can_capture_again = False
         if captured and not promoted:
             next_captures = self.get_captures(end_r, end_c)
