@@ -148,7 +148,12 @@ class CheckersGame:
                 new_row, new_col = row + dr, col + dc
                 mid_row, mid_col = row + dr // 2, col + dc // 2
 
-                if 0 <= new_row < 8 and 0 <= new_col < 8:
+                # Verificar limites E casa escura
+                if (
+                    0 <= new_row < 8 
+                    and 0 <= new_col < 8
+                    and (new_row + new_col) % 2 == 1  # Casa escura
+                ):
                     mid_piece = self.board[mid_row][mid_col]
                     if (
                         mid_piece != EMPTY
@@ -169,15 +174,22 @@ class CheckersGame:
             enemy_pos = None
 
             while 0 <= r < 8 and 0 <= c < 8:
+                # Verificar se é casa escura (peças só podem estar em casas escuras)
+                if (r + c) % 2 != 1:
+                    # Casa clara - pular (peças não podem estar aqui)
+                    r += dr
+                    c += dc
+                    continue
+                
                 current_piece = self.board[r][c]
 
                 if current_piece == EMPTY:
-                    # Se já vimos exatamente um inimigo antes, qualquer casa vazia
+                    # Se já vimos exatamente um inimigo antes, qualquer casa vazia ESCURA
                     # depois dele é um destino válido de captura.
                     if seen_enemy and enemy_pos is not None:
                         captures.append((r, c, enemy_pos[0], enemy_pos[1]))
                 else:
-                    # Encontrou uma peça
+                    # Encontrou uma peça (em casa escura)
                     if self.is_piece_of_player(current_piece, self.turn):
                         # Peça própria bloqueia o caminho → parar nesta direção
                         break
@@ -190,7 +202,7 @@ class CheckersGame:
                         # Já havia inimigo no caminho → duas peças inimigas bloqueiam
                         break
 
-                # Avançar na diagonal
+                # Avançar na diagonal (pula casas claras automaticamente)
                 r += dr
                 c += dc
 
@@ -216,6 +228,7 @@ class CheckersGame:
         - Peça normal: 1 casa na diagonal, apenas para frente.
         - Dama: qualquer número de casas na diagonal (frente ou trás),
           até encontrar uma peça ou a borda do tabuleiro.
+        - Todas as peças só podem estar em casas escuras (row + col) % 2 == 1
         """
         piece = self.board[row][col]
         if piece == EMPTY:
@@ -232,9 +245,11 @@ class CheckersGame:
 
             for dr, dc in directions:
                 new_row, new_col = row + dr, col + dc
+                # Verificar limites, casa vazia E casa escura
                 if (
                     0 <= new_row < 8
                     and 0 <= new_col < 8
+                    and (new_row + new_col) % 2 == 1  # Casa escura
                     and self.board[new_row][new_col] == EMPTY
                 ):
                     moves.append((new_row, new_col))
@@ -248,11 +263,15 @@ class CheckersGame:
             r = row + dr
             c = col + dc
             while 0 <= r < 8 and 0 <= c < 8:
-                if self.board[r][c] == EMPTY:
-                    moves.append((r, c))
-                else:
-                    # Qualquer peça (própria ou inimiga) bloqueia a continuidade
-                    break
+                # Verificar se é casa escura (peças só podem estar em casas escuras)
+                if (r + c) % 2 == 1:
+                    if self.board[r][c] == EMPTY:
+                        moves.append((r, c))
+                    else:
+                        # Qualquer peça (própria ou inimiga) bloqueia a continuidade
+                        break
+                # Se for casa clara, pular (peças não podem estar aqui)
+                # Avançar na diagonal
                 r += dr
                 c += dc
 
@@ -275,20 +294,37 @@ class CheckersGame:
         if self.board[end_r][end_c] != EMPTY:
             return False, "A casa de destino não está vazia."
 
-        all_captures = self.get_all_captures_for_player()
+    def is_valid_move(self, start_r, start_c, end_r, end_c):
+        """Valida movimento."""
+        if not (0 <= start_r < 8 and 0 <= start_c < 8 and 
+                0 <= end_r < 8 and 0 <= end_c < 8):
+            return False, "Posição fora do tabuleiro."
 
-        # 1) Verificar se este movimento é uma captura válida
+        piece = self.board[start_r][start_c]
+        
+        if piece == EMPTY:
+            return False, "Não há peça na origem."
+        
+        if not self.is_piece_of_player(piece, self.turn):
+            return False, "Esta peça não pertence ao jogador atual."
+
+        if self.board[end_r][end_c] != EMPTY:
+            return False, "A casa de destino não está vazia."
+
+        # Verificar capturas possíveis desta peça específica
         captures_from_piece = self.get_captures(start_r, start_c)
+        
+        # 1) Verificar se este movimento é uma captura válida desta peça
         for cap_r, cap_c, _, _ in captures_from_piece:
             if cap_r == end_r and cap_c == end_c:
                 return True, "Captura válida."
 
-        # Se existem capturas possíveis (com qualquer peça) e o jogador tentou
-        # um movimento que não é captura ⇒ inválido.
-        if all_captures:
+        # 2) Se esta peça PODE capturar, mas o jogador tentou movimento simples
+        # então é inválido (captura obrigatória para esta peça)
+        if captures_from_piece:
             return False, "Você deve capturar quando possível!"
 
-        # 2) Caso não haja capturas, verificar se é movimento simples válido
+        # 3) Caso esta peça não possa capturar, verificar movimento simples
         simple_moves = self.get_simple_moves(start_r, start_c)
         for move_r, move_c in simple_moves:
             if move_r == end_r and move_c == end_c:
@@ -491,6 +527,11 @@ def move():
             "time_analysis": time_analysis
         }), 200
     else:
+        # Debug: log do erro para identificar problema
+        print(f"❌ Movimento inválido: ({start_r},{start_c}) -> ({end_r},{end_c}) | Turno: {game.turn} | Erro: {message}")
+        print(f"   Peça na origem: {game.board[start_r][start_c]}")
+        print(f"   Capturas possíveis desta peça: {game.get_captures(start_r, start_c)}")
+        print(f"   Movimentos simples possíveis: {game.get_simple_moves(start_r, start_c)}")
         return jsonify({"status": "error", "message": message}), 400
 
 @app.route('/ai-move', methods=['POST'])
