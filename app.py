@@ -35,7 +35,16 @@ class CheckersGame:
         self.initialize_board()
 
     def initialize_board(self):
-        """Inicializa o tabuleiro."""
+        """
+        Inicializa o tabuleiro seguindo as REGRAS BRASILEIRAS OFICIAIS.
+        
+        Regras de inicialização:
+        - Tabuleiro 8x8
+        - Peças só ficam em casas escuras (row + col) % 2 == 1
+        - P2 (vermelhas/pretas): linhas 0, 1, 2 (3 primeiras linhas)
+        - P1 (brancas/vermelhas): linhas 5, 6, 7 (3 últimas linhas)
+        - Linhas 3 e 4 ficam vazias (área neutra)
+        """
         self.board = [[EMPTY for _ in range(8)] for _ in range(8)]
         self.turn = P1
         self.winner = None
@@ -45,13 +54,14 @@ class CheckersGame:
         self.player1_warnings = 0
         self.player2_warnings = 0
         
+        # Colocar peças nas casas escuras das 3 primeiras e 3 últimas linhas
         for row in range(8):
             for col in range(8):
-                if (row + col) % 2 == 1:
+                if (row + col) % 2 == 1:  # Casa escura
                     if row < 3:
-                        self.board[row][col] = P2
+                        self.board[row][col] = P2  # Peças do jogador 2 (topo)
                     elif row > 4:
-                        self.board[row][col] = P1
+                        self.board[row][col] = P1  # Peças do jogador 1 (base)
 
     def configure_game(self, p1_name, p2_name, mode="pvp"):
         """Configura nomes e modo de jogo."""
@@ -278,27 +288,24 @@ class CheckersGame:
         return moves
 
     def is_valid_move(self, start_r, start_c, end_r, end_c):
-        """Valida movimento."""
+        """
+        Valida movimento seguindo as REGRAS BRASILEIRAS OFICIAIS de damas.
+        
+        Regras:
+        1. Peças só podem estar em casas escuras (row + col) % 2 == 1
+        2. Peça normal: move 1 casa na diagonal para frente
+        3. Dama: move qualquer número de casas na diagonal (frente ou trás)
+        4. Captura é OBRIGATÓRIA se possível
+        5. Captura múltipla é obrigatória (deve continuar capturando)
+        """
+        # Validações básicas
         if not (0 <= start_r < 8 and 0 <= start_c < 8 and 
                 0 <= end_r < 8 and 0 <= end_c < 8):
             return False, "Posição fora do tabuleiro."
 
-        piece = self.board[start_r][start_c]
-        
-        if piece == EMPTY:
-            return False, "Não há peça na origem."
-        
-        if not self.is_piece_of_player(piece, self.turn):
-            return False, "Esta peça não pertence ao jogador atual."
-
-        if self.board[end_r][end_c] != EMPTY:
-            return False, "A casa de destino não está vazia."
-
-    def is_valid_move(self, start_r, start_c, end_r, end_c):
-        """Valida movimento."""
-        if not (0 <= start_r < 8 and 0 <= start_c < 8 and 
-                0 <= end_r < 8 and 0 <= end_c < 8):
-            return False, "Posição fora do tabuleiro."
+        # Verificar se destino é casa escura (obrigatório)
+        if (end_r + end_c) % 2 != 1:
+            return False, "Peças só podem estar em casas escuras."
 
         piece = self.board[start_r][start_c]
         
@@ -319,12 +326,20 @@ class CheckersGame:
             if cap_r == end_r and cap_c == end_c:
                 return True, "Captura válida."
 
-        # 2) Se esta peça PODE capturar, mas o jogador tentou movimento simples
+        # 2) REGRA BRASILEIRA: Se esta peça PODE capturar, mas o jogador tentou movimento simples
         # então é inválido (captura obrigatória para esta peça)
         if captures_from_piece:
-            return False, "Você deve capturar quando possível!"
+            return False, "Captura obrigatória! Esta peça deve capturar."
 
-        # 3) Caso esta peça não possa capturar, verificar movimento simples
+        # 3) Verificar se há capturas possíveis com OUTRAS peças do jogador
+        # REGRA BRASILEIRA: Se qualquer peça pode capturar, o jogador DEVE capturar
+        all_captures = self.get_all_captures_for_player()
+        if all_captures:
+            # Se há capturas possíveis, mas esta peça não pode capturar,
+            # o jogador deve escolher uma peça que pode capturar
+            return False, "Captura obrigatória! Escolha uma peça que pode capturar."
+
+        # 4) Caso não haja capturas obrigatórias, verificar movimento simples
         simple_moves = self.get_simple_moves(start_r, start_c)
         for move_r, move_c in simple_moves:
             if move_r == end_r and move_c == end_c:
@@ -401,13 +416,16 @@ class CheckersGame:
             time_analysis = self.analyze_time_comparison(move_time)
             # REMOVIDO: apply_time_penalty() - era confuso e bugado
         
-        # Verificar se pode capturar novamente
+        # REGRA BRASILEIRA: Verificar se pode capturar novamente (captura múltipla obrigatória)
         can_capture_again = False
         if captured and not promoted:
             next_captures = self.get_captures(end_r, end_c)
             if next_captures:
                 can_capture_again = True
+                # Não muda o turno - jogador DEVE continuar capturando
+                return True, "Captura realizada! Você DEVE continuar capturando.", time_analysis
         
+        # Só muda o turno se não houver captura múltipla obrigatória
         if not can_capture_again:
             self.turn = P2 if self.turn == P1 else P1
             self.check_winner()

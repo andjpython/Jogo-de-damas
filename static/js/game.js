@@ -318,29 +318,33 @@ function calculateValidMoves(row, col) {
         const simpleDirs = piece === P1 ? [[-1, -1], [-1, 1]] : [[1, -1], [1, 1]];
         const captureDirs = piece === P1 ? [[-2, -2], [-2, 2]] : [[2, -2], [2, 2]];
 
-        // Movimentos simples
+        // Movimentos simples (REGRA BRASILEIRA: só em casas escuras)
         simpleDirs.forEach(([dr, dc]) => {
             const newRow = row + dr;
             const newCol = col + dc;
+            // Verificar limites, casa vazia E casa escura (row + col) % 2 == 1
             if (
                 newRow >= 0 && newRow < 8 &&
                 newCol >= 0 && newCol < 8 &&
+                (newRow + newCol) % 2 === 1 &&  // Casa escura obrigatória
                 gameState.board[newRow][newCol] === EMPTY
             ) {
                 tempMoves.push({ row: newRow, col: newCol, isCapture: false });
             }
         });
 
-        // Capturas (pulo de 2 casas)
+        // Capturas (pulo de 2 casas) - REGRA BRASILEIRA: só em casas escuras
         captureDirs.forEach(([dr, dc]) => {
             const newRow = row + dr;
             const newCol = col + dc;
             const midRow = row + dr / 2;
             const midCol = col + dc / 2;
 
+            // Verificar limites, casa escura E casa vazia
             if (
                 newRow >= 0 && newRow < 8 &&
                 newCol >= 0 && newCol < 8 &&
+                (newRow + newCol) % 2 === 1 &&  // Casa escura obrigatória
                 gameState.board[newRow][newCol] === EMPTY
             ) {
                 const midPiece = gameState.board[midRow][midCol];
@@ -361,11 +365,19 @@ function calculateValidMoves(row, col) {
             let enemyPos = null;
 
             while (r >= 0 && r < 8 && c >= 0 && c < 8) {
+                // REGRA BRASILEIRA: Peças só podem estar em casas escuras
+                if ((r + c) % 2 !== 1) {
+                    // Casa clara - pular
+                    r += dr;
+                    c += dc;
+                    continue;
+                }
+                
                 const target = gameState.board[r][c];
 
                 if (target === EMPTY) {
                     if (seenEnemy && enemyPos) {
-                        // Casa vazia DEPOIS de um inimigo → destino de captura
+                        // Casa vazia ESCURA DEPOIS de um inimigo → destino de captura
                         tempMoves.push({
                             row: r,
                             col: c,
@@ -375,11 +387,11 @@ function calculateValidMoves(row, col) {
                         });
                         hasCaptures = true;
                     } else if (!seenEnemy) {
-                        // Movimento simples da dama (sem captura)
+                        // Movimento simples da dama (sem captura) em casa escura
                         tempMoves.push({ row: r, col: c, isCapture: false });
                     }
                 } else {
-                    // Encontrou uma peça
+                    // Encontrou uma peça (em casa escura)
                     if (isPieceOfCurrentPlayer(target)) {
                         // Peça própria → bloqueia tudo nessa direção
                         break;
