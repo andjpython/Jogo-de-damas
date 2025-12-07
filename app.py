@@ -142,32 +142,76 @@ class CheckersGame:
         return False
 
     def get_captures(self, row, col):
-        """Retorna capturas possíveis."""
+        """
+        Retorna capturas possíveis, incluindo movimento longo de Dama.
+
+        Regras implementadas:
+        - Peças normais capturam pulando 2 casas na diagonal (como antes).
+        - Damas (P1_KING, P2_KING) podem capturar em QUALQUER distância na mesma
+          diagonal, desde que:
+            * Haja exatamente 1 peça inimiga no caminho.
+            * Todas as casas após o inimigo até o destino estejam vazias.
+            * Não haja peça própria bloqueando o caminho.
+        """
         piece = self.board[row][col]
         if piece == EMPTY:
             return []
-        
+
         captures = []
-        directions = []
-        
-        if piece == P1:
-            directions = [(-2, -2), (-2, 2)]
-        elif piece == P2:
-            directions = [(2, -2), (2, 2)]
-        else:
-            directions = [(-2, -2), (-2, 2), (2, -2), (2, 2)]
-        
+
+        # Peças normais (não-damas): mesma lógica antiga (2 casas)
+        if piece in (P1, P2):
+            directions = [(-2, -2), (-2, 2)] if piece == P1 else [(2, -2), (2, 2)]
+            for dr, dc in directions:
+                new_row, new_col = row + dr, col + dc
+                mid_row, mid_col = row + dr // 2, col + dc // 2
+
+                if 0 <= new_row < 8 and 0 <= new_col < 8:
+                    mid_piece = self.board[mid_row][mid_col]
+                    if (
+                        mid_piece != EMPTY
+                        and not self.is_piece_of_player(mid_piece, self.turn)
+                        and self.board[new_row][new_col] == EMPTY
+                    ):
+                        captures.append((new_row, new_col, mid_row, mid_col))
+
+            return captures
+
+        # DAMAS: podem capturar em qualquer distância na diagonal
+        directions = [(-1, -1), (-1, 1), (1, -1), (1, 1)]
+
         for dr, dc in directions:
-            new_row, new_col = row + dr, col + dc
-            mid_row, mid_col = row + dr // 2, col + dc // 2
-            
-            if 0 <= new_row < 8 and 0 <= new_col < 8:
-                mid_piece = self.board[mid_row][mid_col]
-                if (mid_piece != EMPTY and 
-                    not self.is_piece_of_player(mid_piece, self.turn) and
-                    self.board[new_row][new_col] == EMPTY):
-                    captures.append((new_row, new_col, mid_row, mid_col))
-        
+            r = row + dr
+            c = col + dc
+            seen_enemy = False
+            enemy_pos = None
+
+            while 0 <= r < 8 and 0 <= c < 8:
+                current_piece = self.board[r][c]
+
+                if current_piece == EMPTY:
+                    # Se já vimos exatamente um inimigo antes, qualquer casa vazia
+                    # depois dele é um destino válido de captura.
+                    if seen_enemy and enemy_pos is not None:
+                        captures.append((r, c, enemy_pos[0], enemy_pos[1]))
+                else:
+                    # Encontrou uma peça
+                    if self.is_piece_of_player(current_piece, self.turn):
+                        # Peça própria bloqueia o caminho → parar nesta direção
+                        break
+
+                    # Peça inimiga
+                    if not seen_enemy:
+                        seen_enemy = True
+                        enemy_pos = (r, c)
+                    else:
+                        # Já havia inimigo no caminho → duas peças inimigas bloqueiam
+                        break
+
+                # Avançar na diagonal
+                r += dr
+                c += dc
+
         return captures
 
     def get_all_captures_for_player(self):
@@ -183,27 +227,53 @@ class CheckersGame:
         return all_captures
 
     def get_simple_moves(self, row, col):
-        """Retorna movimentos simples."""
+        """
+        Retorna movimentos simples (sem captura).
+
+        Regras:
+        - Peça normal: 1 casa na diagonal, apenas para frente.
+        - Dama: qualquer número de casas na diagonal (frente ou trás),
+          até encontrar uma peça ou a borda do tabuleiro.
+        """
         piece = self.board[row][col]
         if piece == EMPTY:
             return []
-        
+
         moves = []
-        directions = []
-        
-        if piece == P1:
-            directions = [(-1, -1), (-1, 1)]
-        elif piece == P2:
-            directions = [(1, -1), (1, 1)]
-        else:
-            directions = [(-1, -1), (-1, 1), (1, -1), (1, 1)]
-        
+
+        # Peças normais: 1 passo na direção correta
+        if piece in (P1, P2):
+            if piece == P1:
+                directions = [(-1, -1), (-1, 1)]
+            else:
+                directions = [(1, -1), (1, 1)]
+
+            for dr, dc in directions:
+                new_row, new_col = row + dr, col + dc
+                if (
+                    0 <= new_row < 8
+                    and 0 <= new_col < 8
+                    and self.board[new_row][new_col] == EMPTY
+                ):
+                    moves.append((new_row, new_col))
+
+            return moves
+
+        # DAMAS: podem andar várias casas na diagonal
+        directions = [(-1, -1), (-1, 1), (1, -1), (1, 1)]
+
         for dr, dc in directions:
-            new_row, new_col = row + dr, col + dc
-            if (0 <= new_row < 8 and 0 <= new_col < 8 and
-                self.board[new_row][new_col] == EMPTY):
-                moves.append((new_row, new_col))
-        
+            r = row + dr
+            c = col + dc
+            while 0 <= r < 8 and 0 <= c < 8:
+                if self.board[r][c] == EMPTY:
+                    moves.append((r, c))
+                else:
+                    # Qualquer peça (própria ou inimiga) bloqueia a continuidade
+                    break
+                r += dr
+                c += dc
+
         return moves
 
     def is_valid_move(self, start_r, start_c, end_r, end_c):
@@ -224,26 +294,24 @@ class CheckersGame:
             return False, "A casa de destino não está vazia."
 
         all_captures = self.get_all_captures_for_player()
-        row_diff = abs(end_r - start_r)
-        col_diff = abs(end_c - start_c)
-        
-        if row_diff == 2 and col_diff == 2:
-            captures = self.get_captures(start_r, start_c)
-            for cap_r, cap_c, _, _ in captures:
-                if cap_r == end_r and cap_c == end_c:
-                    return True, "Captura válida."
-            return False, "Captura inválida."
-        
-        elif row_diff == 1 and col_diff == 1:
-            if all_captures:
-                return False, "Você deve capturar quando possível!"
-            
-            simple_moves = self.get_simple_moves(start_r, start_c)
-            for move_r, move_c in simple_moves:
-                if move_r == end_r and move_c == end_c:
-                    return True, "Movimento válido."
-            return False, "Movimento inválido."
-        
+
+        # 1) Verificar se este movimento é uma captura válida
+        captures_from_piece = self.get_captures(start_r, start_c)
+        for cap_r, cap_c, _, _ in captures_from_piece:
+            if cap_r == end_r and cap_c == end_c:
+                return True, "Captura válida."
+
+        # Se existem capturas possíveis (com qualquer peça) e o jogador tentou
+        # um movimento que não é captura ⇒ inválido.
+        if all_captures:
+            return False, "Você deve capturar quando possível!"
+
+        # 2) Caso não haja capturas, verificar se é movimento simples válido
+        simple_moves = self.get_simple_moves(start_r, start_c)
+        for move_r, move_c in simple_moves:
+            if move_r == end_r and move_c == end_c:
+                return True, "Movimento válido."
+
         return False, "Movimento inválido."
 
     def check_winner(self):

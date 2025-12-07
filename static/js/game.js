@@ -310,39 +310,96 @@ function calculateValidMoves(row, col) {
     validMoves = [];
     const piece = gameState.board[row][col];
     
-    let directions = [];
-    if (piece === P1) {
-        directions = [[-1, -1], [-1, 1], [-2, -2], [-2, 2]];
-    } else if (piece === P2) {
-        directions = [[1, -1], [1, 1], [2, -2], [2, 2]];
-    } else {
-        directions = [[-1, -1], [-1, 1], [1, -1], [1, 1], 
-                     [-2, -2], [-2, 2], [2, -2], [2, 2]];
-    }
-    
     let hasCaptures = false;
     let tempMoves = [];
     
-    directions.forEach(([dr, dc]) => {
-        const newRow = row + dr;
-        const newCol = col + dc;
-        
-        if (newRow >= 0 && newRow < 8 && newCol >= 0 && newCol < 8) {
-            if (gameState.board[newRow][newCol] === EMPTY) {
-                if (Math.abs(dr) === 1) {
-                    tempMoves.push({ row: newRow, col: newCol, isCapture: false });
-                } else {
-                    const midRow = row + dr / 2;
-                    const midCol = col + dc / 2;
-                    const midPiece = gameState.board[midRow][midCol];
-                    if (midPiece !== EMPTY && !isPieceOfCurrentPlayer(midPiece)) {
-                        tempMoves.push({ row: newRow, col: newCol, isCapture: true });
-                        hasCaptures = true;
-                    }
+    // 1) Peças normais (não-damas): 1 passo simples / captura de 2 casas
+    if (piece === P1 || piece === P2) {
+        const simpleDirs = piece === P1 ? [[-1, -1], [-1, 1]] : [[1, -1], [1, 1]];
+        const captureDirs = piece === P1 ? [[-2, -2], [-2, 2]] : [[2, -2], [2, 2]];
+
+        // Movimentos simples
+        simpleDirs.forEach(([dr, dc]) => {
+            const newRow = row + dr;
+            const newCol = col + dc;
+            if (
+                newRow >= 0 && newRow < 8 &&
+                newCol >= 0 && newCol < 8 &&
+                gameState.board[newRow][newCol] === EMPTY
+            ) {
+                tempMoves.push({ row: newRow, col: newCol, isCapture: false });
+            }
+        });
+
+        // Capturas (pulo de 2 casas)
+        captureDirs.forEach(([dr, dc]) => {
+            const newRow = row + dr;
+            const newCol = col + dc;
+            const midRow = row + dr / 2;
+            const midCol = col + dc / 2;
+
+            if (
+                newRow >= 0 && newRow < 8 &&
+                newCol >= 0 && newCol < 8 &&
+                gameState.board[newRow][newCol] === EMPTY
+            ) {
+                const midPiece = gameState.board[midRow][midCol];
+                if (midPiece !== EMPTY && !isPieceOfCurrentPlayer(midPiece)) {
+                    tempMoves.push({ row: newRow, col: newCol, isCapture: true });
+                    hasCaptures = true;
                 }
             }
-        }
-    });
+        });
+    } else {
+        // 2) DAMAS: movimento longo na diagonal + captura à distância
+        const directions = [[-1, -1], [-1, 1], [1, -1], [1, 1]];
+
+        directions.forEach(([dr, dc]) => {
+            let r = row + dr;
+            let c = col + dc;
+            let seenEnemy = false;
+            let enemyPos = null;
+
+            while (r >= 0 && r < 8 && c >= 0 && c < 8) {
+                const target = gameState.board[r][c];
+
+                if (target === EMPTY) {
+                    if (seenEnemy && enemyPos) {
+                        // Casa vazia DEPOIS de um inimigo → destino de captura
+                        tempMoves.push({
+                            row: r,
+                            col: c,
+                            isCapture: true,
+                            enemyRow: enemyPos.row,
+                            enemyCol: enemyPos.col,
+                        });
+                        hasCaptures = true;
+                    } else if (!seenEnemy) {
+                        // Movimento simples da dama (sem captura)
+                        tempMoves.push({ row: r, col: c, isCapture: false });
+                    }
+                } else {
+                    // Encontrou uma peça
+                    if (isPieceOfCurrentPlayer(target)) {
+                        // Peça própria → bloqueia tudo nessa direção
+                        break;
+                    }
+
+                    // Peça inimiga
+                    if (!seenEnemy) {
+                        seenEnemy = true;
+                        enemyPos = { row: r, col: c };
+                    } else {
+                        // Já havia visto um inimigo antes → duas peças bloqueiam
+                        break;
+                    }
+                }
+
+                r += dr;
+                c += dc;
+            }
+        });
+    }
     
     if (hasCaptures) {
         validMoves = tempMoves.filter(m => m.isCapture);
