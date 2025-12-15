@@ -7,6 +7,7 @@ let currentRoomId = null;
 let isPlayer1 = false;
 let playerName = '';
 let isMultiplayerMode = false;
+let createRoomTimer = null;
 
 // ========================================
 // INICIALIZAÇÃO
@@ -60,6 +61,10 @@ function initSocket() {
     });
     
     socket.on('room_created', (data) => {
+        if (createRoomTimer) {
+            clearTimeout(createRoomTimer);
+            createRoomTimer = null;
+        }
         currentRoomId = data.room_id;
         document.getElementById('roomIdDisplay').textContent = currentRoomId;
         document.getElementById('shareRoomId').textContent = currentRoomId;
@@ -155,6 +160,10 @@ function initSocket() {
     });
     
     socket.on('create_room_error', (data) => {
+        if (createRoomTimer) {
+            clearTimeout(createRoomTimer);
+            createRoomTimer = null;
+        }
         showMessage(data.message, 'error');
         // Reabilitar botão em caso de erro
         const btn = document.getElementById('createRoomBtn') || document.querySelector('button[onclick*="createMultiplayerRoom"]');
@@ -276,6 +285,16 @@ async function createMultiplayerRoom() {
     try {
         await ensureSocketConnected(5000);
         socket.emit('create_room', { player_name: playerName });
+        // Timeout de segurança caso o servidor não responda
+        if (createRoomTimer) clearTimeout(createRoomTimer);
+        createRoomTimer = setTimeout(() => {
+            createRoomTimer = null;
+            showMessage('Erro: servidor não respondeu ao criar sala. Tente novamente.', 'error');
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = '➕ Criar Sala';
+            }
+        }, 6000);
     } catch (error) {
         console.error('Erro ao conectar para criar sala:', error);
         alert('Erro: Não foi possível conectar ao servidor. Tente novamente.');
