@@ -5,6 +5,11 @@ Desenvolvido com Flask
 ========================================
 """
 
+import eventlet
+
+# Importante para habilitar WebSockets/long-polling corretamente com eventlet
+eventlet.monkey_patch()
+
 from flask import Flask, jsonify, request, render_template
 from flask_socketio import SocketIO, emit, join_room, leave_room
 import random
@@ -713,7 +718,7 @@ def handle_create_room(data):
         print(f"✅ Sala {room_id} criada por {player_name} (SID: {request.sid})")
         
     except Exception as e:
-        print(f"❌ Erro ao criar sala: {str(e)}")
+        print(f"❌ Erro ao criar sala: {str(e)} | SID: {request.sid}")
         emit('create_room_error', {
             'message': f'Erro ao criar sala: {str(e)}'
         })
@@ -729,6 +734,7 @@ def handle_join_room(data):
     if success:
         room = game_manager.get_room(room_id)
         join_room(room_id)
+        print(f"✅ Jogador '{player_name}' entrou na sala {room_id} | SID: {request.sid}")
         
         # Configurar o jogo com os nomes dos jogadores
         room.game = CheckersGame()
@@ -750,6 +756,7 @@ def handle_join_room(data):
         socketio.emit('game_state', room.game.get_state(), room=room_id)
         socketio.emit('game_started', {'message': 'Jogo iniciado!'}, room=room_id)
     else:
+        print(f"❌ Erro ao entrar na sala {room_id} | SID: {request.sid} | Motivo: {message}")
         emit('join_error', {'message': message})
 
 @socketio.on('get_rooms')
