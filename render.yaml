@@ -3,7 +3,7 @@ services:
     name: jogo-de-dama
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app
+    startCommand: gunicorn --worker-class eventlet -w 1 --timeout 120 --keep-alive 5 app:app
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0

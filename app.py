@@ -13,7 +13,16 @@ from game_manager import GameManager
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'dama-multiplayer-secret-key-2024'
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+# Configuração SocketIO com ping/pong para manter conexões vivas
+socketio = SocketIO(
+    app, 
+    cors_allowed_origins="*", 
+    async_mode='eventlet',
+    ping_timeout=60,
+    ping_interval=25,
+    logger=True,
+    engineio_logger=False
+)
 
 # Gerenciador de salas multiplayer
 game_manager = GameManager()
@@ -625,29 +634,40 @@ def get_rooms():
 @socketio.on('connect')
 def handle_connect():
     """Quando um cliente se conecta."""
-    print(f"✅ Cliente conectado: {request.sid}")
-    emit('connected', {'message': 'Conectado ao servidor!'})
+    try:
+        print(f"✅ Cliente conectado: {request.sid}")
+        emit('connected', {'message': 'Conectado ao servidor!'})
+    except Exception as e:
+        print(f"❌ Erro ao conectar cliente {request.sid}: {str(e)}")
+
+@socketio.on('ping')
+def handle_ping():
+    """Responde a ping para manter conexão viva."""
+    emit('pong')
 
 @socketio.on('disconnect')
 def handle_disconnect():
     """Quando um cliente se desconecta."""
-    print(f"❌ Cliente desconectado: {request.sid}")
-    result = game_manager.leave_room(request.sid)
-    if result:
-        room_id, player_type = result
-        if player_type == "host":
-            # Notificar guest que o host saiu
-            room = game_manager.get_room(room_id)
-            if room and room.guest_sid:
-                emit('host_left', {'message': 'O host saiu da sala'}, room=room.guest_sid)
-        else:
-            # Notificar host que o guest saiu
-            room = game_manager.get_room(room_id)
-            if room and room.host_sid:
-                emit('guest_left', {'message': 'O adversário saiu da sala'}, room=room.host_sid)
-                room.status = "waiting"
-                room.guest_name = None
-                room.guest_sid = None
+    try:
+        print(f"❌ Cliente desconectado: {request.sid}")
+        result = game_manager.leave_room(request.sid)
+        if result:
+            room_id, player_type = result
+            if player_type == "host":
+                # Notificar guest que o host saiu
+                room = game_manager.get_room(room_id)
+                if room and room.guest_sid:
+                    socketio.emit('host_left', {'message': 'O host saiu da sala'}, room=room.guest_sid)
+            else:
+                # Notificar host que o guest saiu
+                room = game_manager.get_room(room_id)
+                if room and room.host_sid:
+                    socketio.emit('guest_left', {'message': 'O adversário saiu da sala'}, room=room.host_sid)
+                    room.status = "waiting"
+                    room.guest_name = None
+                    room.guest_sid = None
+    except Exception as e:
+        print(f"❌ Erro ao desconectar cliente {request.sid}: {str(e)}")
 
 @socketio.on('create_room')
 def handle_create_room(data):
