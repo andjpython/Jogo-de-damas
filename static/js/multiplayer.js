@@ -190,8 +190,10 @@ function showMultiplayerMenu() {
     document.getElementById('roomsList').style.display = 'none';
     
     // Inicializar socket se ainda não foi inicializado
-    if (!socket || !socket.connected) {
+    if (!socket) {
         initSocket();
+    } else if (!socket.connected) {
+        socket.connect();
     }
     
     // Garantir que o botão está habilitado
@@ -202,7 +204,55 @@ function showMultiplayerMenu() {
     }
 }
 
-function createMultiplayerRoom() {
+async function ensureSocketConnected(timeoutMs = 4000) {
+    return new Promise((resolve, reject) => {
+        if (!socket) {
+            initSocket();
+        }
+
+        // Já conectado
+        if (socket && socket.connected) {
+            return resolve();
+        }
+
+        let resolved = false;
+
+        const onConnect = () => {
+            if (!resolved) {
+                resolved = true;
+                cleanup();
+                resolve();
+            }
+        };
+
+        const onError = (err) => {
+            if (!resolved) {
+                resolved = true;
+                cleanup();
+                reject(err || new Error('Falha ao conectar'));
+            }
+        };
+
+        const cleanup = () => {
+            socket.off('connect', onConnect);
+            socket.off('connect_error', onError);
+        };
+
+        socket.on('connect', onConnect);
+        socket.on('connect_error', onError);
+        socket.connect();
+
+        setTimeout(() => {
+            if (!resolved) {
+                resolved = true;
+                cleanup();
+                reject(new Error('Tempo de conexão esgotado'));
+            }
+        }, timeoutMs);
+    });
+}
+
+async function createMultiplayerRoom() {
     const btn = event?.target || document.getElementById('createRoomBtn') || document.querySelector('button[onclick*="createMultiplayerRoom"]');
     
     // Prevenir múltiplos cliques
@@ -223,49 +273,12 @@ function createMultiplayerRoom() {
         btn.textContent = '⏳ Criando...';
     }
     
-    // Verificar conexão do socket
-    if (!socket) {
-        console.log('Socket não existe, inicializando...');
-        initSocket();
-        // Aguardar conexão
-        setTimeout(() => {
-            if (socket && socket.connected) {
-                socket.emit('create_room', { player_name: playerName });
-            } else {
-                alert('Erro: Não foi possível conectar ao servidor. Tente novamente.');
-                if (btn) {
-                    btn.disabled = false;
-                    btn.textContent = '➕ Criar Sala';
-                }
-            }
-        }, 1000);
-        return;
-    }
-    
-    if (!socket.connected) {
-        console.log('Socket desconectado, reconectando...');
-        socket.connect();
-        // Aguardar reconexão
-        setTimeout(() => {
-            if (socket.connected) {
-                socket.emit('create_room', { player_name: playerName });
-            } else {
-                alert('Erro: Não foi possível conectar ao servidor. Tente novamente.');
-                if (btn) {
-                    btn.disabled = false;
-                    btn.textContent = '➕ Criar Sala';
-                }
-            }
-        }, 1000);
-        return;
-    }
-    
-    // Emitir evento de criar sala
     try {
+        await ensureSocketConnected(5000);
         socket.emit('create_room', { player_name: playerName });
     } catch (error) {
-        console.error('Erro ao criar sala:', error);
-        alert('Erro ao criar sala: ' + error.message);
+        console.error('Erro ao conectar para criar sala:', error);
+        alert('Erro: Não foi possível conectar ao servidor. Tente novamente.');
         if (btn) {
             btn.disabled = false;
             btn.textContent = '➕ Criar Sala';
@@ -288,25 +301,27 @@ function showJoinRoom() {
         return;
     }
     
-    if (!socket || !socket.connected) {
-        alert('Erro: Não conectado ao servidor. Tente novamente.');
-        return;
-    }
-    
-    socket.emit('join_room', {
-        room_id: roomId.toUpperCase(),
-        player_name: playerName
-    });
+    ensureSocketConnected(5000)
+        .then(() => {
+            socket.emit('join_room', {
+                room_id: roomId.toUpperCase(),
+                player_name: playerName
+            });
+        })
+        .catch(() => {
+            alert('Erro: Não foi possível conectar ao servidor. Tente novamente.');
+        });
 }
 
 function refreshRoomsList() {
-    if (!socket || !socket.connected) {
-        alert('Erro: Não conectado ao servidor.');
-        return;
-    }
-    
-    socket.emit('get_rooms');
-    document.getElementById('roomsList').style.display = 'block';
+    ensureSocketConnected(5000)
+        .then(() => {
+            socket.emit('get_rooms');
+            document.getElementById('roomsList').style.display = 'block';
+        })
+        .catch(() => {
+            alert('Erro: Não foi possível conectar ao servidor.');
+        });
 }
 
 function displayRoomsList(rooms) {
@@ -338,15 +353,16 @@ function joinRoomById(roomId) {
         return;
     }
     
-    if (!socket || !socket.connected) {
-        alert('Erro: Não conectado ao servidor.');
-        return;
-    }
-    
-    socket.emit('join_room', {
-        room_id: roomId,
-        player_name: playerName
-    });
+    ensureSocketConnected(5000)
+        .then(() => {
+            socket.emit('join_room', {
+                room_id: roomId,
+                player_name: playerName
+            });
+        })
+        .catch(() => {
+            alert('Erro: Não foi possível conectar ao servidor. Tente novamente.');
+        });
 }
 
 // ========================================
@@ -375,13 +391,19 @@ function makeMultiplayerMove(startRow, startCol, endRow, endCol) {
     
     const moveTime = moveStartTime ? (60 - timeLeft) : 0;
     
-    socket.emit('make_move', {
-        start_row: startRow,
-        start_col: startCol,
-        end_row: endRow,
-        end_col: endCol,
-        move_time: moveTime
-    });
+    ensureSocketConnected(5000)
+        .then(() => {
+            socket.emit('make_move', {
+                start_row: startRow,
+                start_col: startCol,
+                end_row: endRow,
+                end_col: endCol,
+                move_time: moveTime
+            });
+        })
+        .catch(() => {
+            showMessage('Erro: Não foi possível conectar ao servidor!', 'error');
+        });
 }
 
 // ========================================
