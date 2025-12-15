@@ -20,13 +20,39 @@ function initSocket() {
     socket = io();
     
     socket.on('connect', () => {
-        console.log('✅ Conectado ao servidor multiplayer!');
+        console.log('✅ Conectado ao servidor multiplayer!', socket.id);
         showMessage('✅ Conectado ao servidor!', 'success');
+        
+        // Reabilitar botão se estava desabilitado
+        const btn = document.getElementById('createRoomBtn') || document.querySelector('button[onclick*="createMultiplayerRoom"]');
+        if (btn && btn.disabled) {
+            btn.disabled = false;
+            btn.textContent = '➕ Criar Sala';
+        }
     });
     
     socket.on('disconnect', () => {
         console.log('❌ Desconectado do servidor');
         showMessage('❌ Desconectado do servidor', 'error');
+        
+        // Reabilitar botão
+        const btn = document.getElementById('createRoomBtn') || document.querySelector('button[onclick*="createMultiplayerRoom"]');
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = '➕ Criar Sala';
+        }
+    });
+    
+    socket.on('connect_error', (error) => {
+        console.error('❌ Erro de conexão:', error);
+        showMessage('❌ Erro ao conectar ao servidor. Tente novamente.', 'error');
+        
+        // Reabilitar botão
+        const btn = document.getElementById('createRoomBtn') || document.querySelector('button[onclick*="createMultiplayerRoom"]');
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = '➕ Criar Sala';
+        }
     });
     
     socket.on('connected', (data) => {
@@ -40,6 +66,13 @@ function initSocket() {
         document.getElementById('roomInfo').style.display = 'block';
         document.getElementById('roomsList').style.display = 'none';
         showMessage(`✅ Sala ${currentRoomId} criada! Aguardando adversário...`, 'success');
+        
+        // Reabilitar botão após criar sala
+        const btn = document.getElementById('createRoomBtn') || document.querySelector('button[onclick*="createMultiplayerRoom"]');
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = '➕ Criar Sala';
+        }
     });
     
     socket.on('game_state', (data) => {
@@ -121,6 +154,16 @@ function initSocket() {
         showMessage(data.message, 'error');
     });
     
+    socket.on('create_room_error', (data) => {
+        showMessage(data.message, 'error');
+        // Reabilitar botão em caso de erro
+        const btn = document.getElementById('createRoomBtn') || document.querySelector('button[onclick*="createMultiplayerRoom"]');
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = '➕ Criar Sala';
+        }
+    });
+    
     socket.on('host_left', (data) => {
         showMessage('❌ O host saiu da sala. Voltando ao menu...', 'error');
         setTimeout(() => {
@@ -142,13 +185,31 @@ function initSocket() {
 // ========================================
 
 function showMultiplayerMenu() {
-    initSocket();
     showScreen('multiplayerScreen');
     document.getElementById('roomInfo').style.display = 'none';
     document.getElementById('roomsList').style.display = 'none';
+    
+    // Inicializar socket se ainda não foi inicializado
+    if (!socket || !socket.connected) {
+        initSocket();
+    }
+    
+    // Garantir que o botão está habilitado
+    const btn = document.getElementById('createRoomBtn');
+    if (btn) {
+        btn.disabled = false;
+        btn.textContent = '➕ Criar Sala';
+    }
 }
 
 function createMultiplayerRoom() {
+    const btn = event?.target || document.getElementById('createRoomBtn') || document.querySelector('button[onclick*="createMultiplayerRoom"]');
+    
+    // Prevenir múltiplos cliques
+    if (btn && btn.disabled) {
+        return;
+    }
+    
     playerName = document.getElementById('multiplayerName').value.trim();
     
     if (!playerName || playerName.length < 2) {
@@ -156,12 +217,60 @@ function createMultiplayerRoom() {
         return;
     }
     
-    if (!socket || !socket.connected) {
-        alert('Erro: Não conectado ao servidor. Tente novamente.');
+    // Desabilitar botão enquanto processa
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = '⏳ Criando...';
+    }
+    
+    // Verificar conexão do socket
+    if (!socket) {
+        console.log('Socket não existe, inicializando...');
+        initSocket();
+        // Aguardar conexão
+        setTimeout(() => {
+            if (socket && socket.connected) {
+                socket.emit('create_room', { player_name: playerName });
+            } else {
+                alert('Erro: Não foi possível conectar ao servidor. Tente novamente.');
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = '➕ Criar Sala';
+                }
+            }
+        }, 1000);
         return;
     }
     
-    socket.emit('create_room', { player_name: playerName });
+    if (!socket.connected) {
+        console.log('Socket desconectado, reconectando...');
+        socket.connect();
+        // Aguardar reconexão
+        setTimeout(() => {
+            if (socket.connected) {
+                socket.emit('create_room', { player_name: playerName });
+            } else {
+                alert('Erro: Não foi possível conectar ao servidor. Tente novamente.');
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = '➕ Criar Sala';
+                }
+            }
+        }, 1000);
+        return;
+    }
+    
+    // Emitir evento de criar sala
+    try {
+        socket.emit('create_room', { player_name: playerName });
+    } catch (error) {
+        console.error('Erro ao criar sala:', error);
+        alert('Erro ao criar sala: ' + error.message);
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = '➕ Criar Sala';
+        }
+    }
 }
 
 function showJoinRoom() {

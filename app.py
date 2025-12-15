@@ -652,21 +652,51 @@ def handle_disconnect():
 @socketio.on('create_room')
 def handle_create_room(data):
     """Cria uma nova sala de jogo."""
-    player_name = data.get('player_name', 'Jogador')
-    room_id = game_manager.create_room(player_name, request.sid)
-    
-    room = game_manager.get_room(room_id)
-    room.game = CheckersGame()
-    room.game.configure_game(room.host_name, "Aguardando...", "multiplayer")
-    
-    join_room(room_id)
-    emit('room_created', {
-        'room_id': room_id,
-        'message': f'Sala {room_id} criada com sucesso!'
-    })
-    
-    # Enviar estado inicial
-    emit('game_state', room.game.get_state())
+    try:
+        player_name = data.get('player_name', 'Jogador')
+        
+        if not player_name or len(player_name.strip()) < 2:
+            emit('create_room_error', {
+                'message': 'Nome inválido! Deve ter pelo menos 2 caracteres.'
+            })
+            return
+        
+        # Verificar se o jogador já está em uma sala
+        existing_room = game_manager.get_room_by_socket(request.sid)
+        if existing_room:
+            emit('create_room_error', {
+                'message': 'Você já está em uma sala!'
+            })
+            return
+        
+        room_id = game_manager.create_room(player_name.strip(), request.sid)
+        
+        room = game_manager.get_room(room_id)
+        if not room:
+            emit('create_room_error', {
+                'message': 'Erro ao criar sala. Tente novamente.'
+            })
+            return
+        
+        room.game = CheckersGame()
+        room.game.configure_game(room.host_name, "Aguardando...", "multiplayer")
+        
+        join_room(room_id)
+        emit('room_created', {
+            'room_id': room_id,
+            'message': f'Sala {room_id} criada com sucesso!'
+        })
+        
+        # Enviar estado inicial
+        emit('game_state', room.game.get_state())
+        
+        print(f"✅ Sala {room_id} criada por {player_name} (SID: {request.sid})")
+        
+    except Exception as e:
+        print(f"❌ Erro ao criar sala: {str(e)}")
+        emit('create_room_error', {
+            'message': f'Erro ao criar sala: {str(e)}'
+        })
 
 @socketio.on('join_room')
 def handle_join_room(data):
