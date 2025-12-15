@@ -6,10 +6,17 @@ Desenvolvido com Flask
 """
 
 from flask import Flask, jsonify, request, render_template
+from flask_socketio import SocketIO, emit, join_room, leave_room
 import random
 import os
+from game_manager import GameManager
 
 app = Flask(__name__)
+app.config['SECRET_KEY'] = 'dama-multiplayer-secret-key-2024'
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+
+# Gerenciador de salas multiplayer
+game_manager = GameManager()
 
 # Constantes
 EMPTY = 0
@@ -382,7 +389,7 @@ class CheckersGame:
         valid, message = self.is_valid_move(start_r, start_c, end_r, end_c)
         
         if not valid:
-            return False, message, None
+            return False, message, None, None
 
         piece = self.board[start_r][start_c]
         
@@ -423,14 +430,14 @@ class CheckersGame:
             if next_captures:
                 can_capture_again = True
                 # Não muda o turno - jogador DEVE continuar capturando
-                return True, "Captura realizada! Você DEVE continuar capturando.", time_analysis
+                return True, "Captura realizada! Você DEVE continuar capturando.", time_analysis, captured_pos
         
         # Só muda o turno se não houver captura múltipla obrigatória
         if not can_capture_again:
             self.turn = P2 if self.turn == P1 else P1
             self.check_winner()
         
-        return True, "Movimento realizado!", time_analysis
+        return True, "Movimento realizado!", time_analysis, captured_pos
 
     def get_ai_move(self):
         """IA Romano escolhe jogada."""
@@ -490,7 +497,7 @@ class CheckersGame:
             "game_started": self.game_started
         }
 
-# Instância global do jogo
+# Instância global do jogo (para modo local/PvC)
 game = CheckersGame()
 
 # ========================================
@@ -535,15 +542,23 @@ def move():
     except ValueError:
         return jsonify({"error": "Os valores devem ser válidos."}), 400
 
-    success, message, time_analysis = game.move_piece(start_r, start_c, end_r, end_c, move_time)
+    result = game.move_piece(start_r, start_c, end_r, end_c, move_time)
+    success = result[0]
+    message = result[1]
+    time_analysis = result[2]
+    captured_pos = result[3] if len(result) > 3 else None
 
     if success:
-        return jsonify({
+        response_data = {
             "status": "success", 
             "message": message, 
             "game_state": game.get_state(),
             "time_analysis": time_analysis
-        }), 200
+        }
+        # Adicionar posição da peça capturada se houver
+        if captured_pos:
+            response_data["captured_pos"] = {"row": captured_pos[0], "col": captured_pos[1]}
+        return jsonify(response_data), 200
     else:
         # Debug: log do erro para identificar problema
         print(f"❌ Movimento inválido: ({start_r},{start_c}) -> ({end_r},{end_c}) | Turno: {game.turn} | Erro: {message}")
@@ -593,14 +608,192 @@ def reset_game():
     
     return jsonify({"status": "success", "game_state": game.get_state()})
 
+# ========================================
+# ROTAS MULTIPLAYER
+# ========================================
+
+@app.route('/rooms', methods=['GET'])
+def get_rooms():
+    """Retorna lista de salas disponíveis."""
+    rooms = game_manager.get_available_rooms()
+    return jsonify({"rooms": rooms})
+
+# ========================================
+# WEBSOCKET EVENTS - MULTIPLAYER
+# ========================================
+
+@socketio.on('connect')
+def handle_connect():
+    """Quando um cliente se conecta."""
+    print(f"✅ Cliente conectado: {request.sid}")
+    emit('connected', {'message': 'Conectado ao servidor!'})
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    """Quando um cliente se desconecta."""
+    print(f"❌ Cliente desconectado: {request.sid}")
+    result = game_manager.leave_room(request.sid)
+    if result:
+        room_id, player_type = result
+        if player_type == "host":
+            # Notificar guest que o host saiu
+            room = game_manager.get_room(room_id)
+            if room and room.guest_sid:
+                emit('host_left', {'message': 'O host saiu da sala'}, room=room.guest_sid)
+        else:
+            # Notificar host que o guest saiu
+            room = game_manager.get_room(room_id)
+            if room and room.host_sid:
+                emit('guest_left', {'message': 'O adversário saiu da sala'}, room=room.host_sid)
+                room.status = "waiting"
+                room.guest_name = None
+                room.guest_sid = None
+
+@socketio.on('create_room')
+def handle_create_room(data):
+    """Cria uma nova sala de jogo."""
+    player_name = data.get('player_name', 'Jogador')
+    room_id = game_manager.create_room(player_name, request.sid)
+    
+    room = game_manager.get_room(room_id)
+    room.game = CheckersGame()
+    room.game.configure_game(room.host_name, "Aguardando...", "multiplayer")
+    
+    join_room(room_id)
+    emit('room_created', {
+        'room_id': room_id,
+        'message': f'Sala {room_id} criada com sucesso!'
+    })
+    
+    # Enviar estado inicial
+    emit('game_state', room.game.get_state())
+
+@socketio.on('join_room')
+def handle_join_room(data):
+    """Entra em uma sala existente."""
+    room_id = data.get('room_id', '').upper()
+    player_name = data.get('player_name', 'Jogador')
+    
+    success, message = game_manager.join_room(room_id, player_name, request.sid)
+    
+    if success:
+        room = game_manager.get_room(room_id)
+        join_room(room_id)
+        
+        # Configurar o jogo com os nomes dos jogadores
+        room.game = CheckersGame()
+        room.game.configure_game(room.host_name, room.guest_name, "multiplayer")
+        
+        # Atribuir lados aos jogadores
+        p1_sid, p2_sid = game_manager.assign_player_sides(room)
+        
+        # Notificar ambos os jogadores
+        emit('room_joined', {
+            'room_id': room_id,
+            'player1_name': room.host_name,
+            'player2_name': room.guest_name,
+            'your_sid': request.sid,
+            'is_player1': request.sid == p1_sid
+        })
+        
+        # Enviar estado do jogo para ambos
+        socketio.emit('game_state', room.game.get_state(), room=room_id)
+        socketio.emit('game_started', {'message': 'Jogo iniciado!'}, room=room_id)
+    else:
+        emit('join_error', {'message': message})
+
+@socketio.on('get_rooms')
+def handle_get_rooms():
+    """Retorna lista de salas disponíveis."""
+    rooms = game_manager.get_available_rooms()
+    emit('rooms_list', {'rooms': rooms})
+
+@socketio.on('make_move')
+def handle_make_move(data):
+    """Processa um movimento no jogo multiplayer."""
+    room = game_manager.get_room_by_socket(request.sid)
+    
+    if not room or not room.game:
+        emit('move_error', {'message': 'Você não está em uma sala!'})
+        return
+    
+    # Verificar se é a vez do jogador
+    is_player1 = request.sid == room.player1_sid
+    current_turn = room.game.turn
+    
+    if (is_player1 and current_turn != P1) or (not is_player1 and current_turn != P2):
+        emit('move_error', {'message': 'Não é sua vez!'})
+        return
+    
+    try:
+        start_r = int(data['start_row'])
+        start_c = int(data['start_col'])
+        end_r = int(data['end_row'])
+        end_c = int(data['end_col'])
+        move_time = float(data.get('move_time', 0))
+    except (ValueError, KeyError):
+        emit('move_error', {'message': 'Parâmetros inválidos!'})
+        return
+    
+    # Executar movimento
+    result = room.game.move_piece(start_r, start_c, end_r, end_c, move_time)
+    success = result[0]
+    message = result[1]
+    time_analysis = result[2]
+    captured_pos = result[3] if len(result) > 3 else None
+    
+    if success:
+        response_data = {
+            "status": "success",
+            "message": message,
+            "game_state": room.game.get_state(),
+            "time_analysis": time_analysis
+        }
+        
+        if captured_pos:
+            response_data["captured_pos"] = {"row": captured_pos[0], "col": captured_pos[1]}
+        
+        # Enviar para todos na sala
+        socketio.emit('move_result', response_data, room=room.room_id)
+        
+        # Verificar se há vencedor
+        if room.game.winner:
+            socketio.emit('game_over', {
+                'winner': room.game.winner,
+                'game_state': room.game.get_state()
+            }, room=room.room_id)
+            room.status = "finished"
+    else:
+        emit('move_error', {'message': message})
+
+@socketio.on('surrender')
+def handle_surrender():
+    """Jogador desiste."""
+    room = game_manager.get_room_by_socket(request.sid)
+    
+    if not room or not room.game:
+        emit('error', {'message': 'Você não está em uma sala!'})
+        return
+    
+    is_player1 = request.sid == room.player1_sid
+    room.game.surrender(P1 if is_player1 else P2)
+    
+    socketio.emit('game_over', {
+        'winner': room.game.winner,
+        'game_state': room.game.get_state()
+    }, room=room.room_id)
+    
+    room.status = "finished"
+
 if __name__ == '__main__':
     import os
     port = int(os.environ.get('PORT', 5000))
     debug = os.environ.get('FLASK_ENV') == 'development'
     
-    print("🎮 Servidor iniciando...")
+    print("🎮 Servidor MULTIPLAYER iniciando...")
     print("📁 Estrutura do projeto:")
-    print("   ├── app.py (Backend)")
+    print("   ├── app.py (Backend + WebSocket)")
+    print("   ├── game_manager.py (Gerenciador de Salas)")
     print("   ├── templates/")
     print("   │   └── index.html")
     print("   └── static/")
@@ -610,6 +803,7 @@ if __name__ == '__main__':
     print("           ├── peça_black_dama.jpg")
     print("           └── peças_red_dama.jpg")
     print(f"\n🚀 Servidor rodando na porta: {port}")
+    print("🌐 Modo MULTIPLAYER ativado!")
     print("=" * 50)
     
-    app.run(debug=debug, host='0.0.0.0', port=port)
+    socketio.run(app, debug=debug, host='0.0.0.0', port=port, allow_unsafe_werkzeug=True)

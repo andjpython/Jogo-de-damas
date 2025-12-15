@@ -15,7 +15,10 @@
             <div class="logo">🎯</div>
             <h1>Jogo de Dama</h1>
             <button class="menu-btn btn-primary" onclick="showConfig('pvp')">
-                👥 Jogar vs Jogador
+                👥 Jogar vs Jogador (Local)
+            </button>
+            <button class="menu-btn btn-success" onclick="showMultiplayerMenu()">
+                🌐 Jogar Online (Multiplayer)
             </button>
             <button class="menu-btn btn-secondary" onclick="showConfig('pvc')">
                 🤖 Jogar vs Romano (CPU)
@@ -161,7 +164,54 @@
     </div>
 
     <!-- JavaScript -->
+    <!-- ========================================
+         TELA: MULTIPLAYER
+         ======================================== -->
+    <div id="multiplayerScreen" class="screen">
+        <div class="config-container">
+            <h1>🌐 Jogar Online</h1>
+            
+            <div class="form-group">
+                <label>Seu Nome:</label>
+                <input type="text" id="multiplayerName" placeholder="Digite seu nome" maxlength="20">
+            </div>
+            
+            <div class="multiplayer-actions">
+                <button class="btn btn-success" onclick="createMultiplayerRoom()">
+                    ➕ Criar Sala
+                </button>
+                <button class="btn btn-primary" onclick="showJoinRoom()">
+                    🔍 Entrar em Sala
+                </button>
+                <button class="btn btn-secondary" onclick="refreshRoomsList()">
+                    🔄 Atualizar Lista
+                </button>
+            </div>
+            
+            <div id="roomInfo" class="room-info" style="display: none;">
+                <h3>Sala: <span id="roomIdDisplay"></span></h3>
+                <p>Aguardando adversário...</p>
+                <p>Compartilhe este código: <strong id="shareRoomId"></strong></p>
+            </div>
+            
+            <div id="roomsList" class="rooms-list" style="display: none;">
+                <h3>Salas Disponíveis:</h3>
+                <div id="roomsContainer"></div>
+            </div>
+            
+            <button class="btn btn-warning" onclick="backToMenu()">
+                ← Voltar ao Menu
+            </button>
+        </div>
+    </div>
+
+    <!-- Socket.IO -->
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <script src="{{ url_for('static', filename='js/game.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/multiplayer.js') }}"></script>
 </body>
 </html>
+
+
+
 

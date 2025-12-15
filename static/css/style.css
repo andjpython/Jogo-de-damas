@@ -597,3 +597,138 @@ input[type="text"] {
     .timer { font-size: 1.5em; }
 }
 
+/* ========================================
+   MULTIPLAYER STYLES
+   ======================================== */
+
+.multiplayer-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin: 20px 0;
+}
+
+.multiplayer-actions .btn {
+    width: 100%;
+    padding: 15px;
+    font-size: 1.1em;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-weight: bold;
+}
+
+.room-info {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 20px;
+    border-radius: 15px;
+    margin: 20px 0;
+    text-align: center;
+    color: white;
+    box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+}
+
+.room-info h3 {
+    margin: 0 0 10px 0;
+    font-size: 1.5em;
+}
+
+.room-info p {
+    margin: 10px 0;
+    font-size: 1.1em;
+}
+
+.room-info strong {
+    font-size: 1.3em;
+    background: rgba(255,255,255,0.2);
+    padding: 5px 15px;
+    border-radius: 8px;
+    display: inline-block;
+    letter-spacing: 2px;
+}
+
+.rooms-list {
+    margin: 20px 0;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.rooms-list h3 {
+    color: white;
+    margin-bottom: 15px;
+}
+
+.room-item {
+    background: rgba(255,255,255,0.1);
+    padding: 15px;
+    border-radius: 10px;
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.2);
+    transition: all 0.3s;
+}
+
+.room-item:hover {
+    background: rgba(255,255,255,0.2);
+    transform: translateX(5px);
+}
+
+.room-info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    color: white;
+}
+
+.room-info-item strong {
+    font-size: 1.2em;
+    color: #ffd700;
+}
+
+.room-info-item span {
+    font-size: 0.9em;
+    opacity: 0.9;
+}
+
+.multiplayer-badge {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 8px 15px;
+    border-radius: 20px;
+    font-size: 0.9em;
+    font-weight: bold;
+    margin: 10px 0;
+    display: inline-block;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.game-header {
+    position: relative;
+}
+
+/* Responsividade para multiplayer */
+@media (max-width: 768px) {
+    .multiplayer-actions {
+        gap: 10px;
+    }
+    
+    .multiplayer-actions .btn {
+        padding: 12px;
+        font-size: 1em;
+    }
+    
+    .room-item {
+        flex-direction: column;
+        gap: 10px;
+        text-align: center;
+    }
+    
+    .room-item .btn {
+        width: 100%;
+    }
+}
+

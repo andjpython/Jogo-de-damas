@@ -337,8 +337,9 @@ function calculateValidMoves(row, col) {
         captureDirs.forEach(([dr, dc]) => {
             const newRow = row + dr;
             const newCol = col + dc;
-            const midRow = row + dr / 2;
-            const midCol = col + dc / 2;
+            // CORREÇÃO: Usar Math.floor para garantir inteiro
+            const midRow = Math.floor(row + dr / 2);
+            const midCol = Math.floor(col + dc / 2);
 
             // Verificar limites, casa escura E casa vazia
             if (
@@ -349,7 +350,13 @@ function calculateValidMoves(row, col) {
             ) {
                 const midPiece = gameState.board[midRow][midCol];
                 if (midPiece !== EMPTY && !isPieceOfCurrentPlayer(midPiece)) {
-                    tempMoves.push({ row: newRow, col: newCol, isCapture: true });
+                    tempMoves.push({ 
+                        row: newRow, 
+                        col: newCol, 
+                        isCapture: true,
+                        capturedRow: midRow,
+                        capturedCol: midCol
+                    });
                     hasCaptures = true;
                 }
             }
@@ -487,13 +494,6 @@ function createPromoteEffect(row, col) {
 async function makeMove(startRow, startCol, endRow, endCol) {
     const moveTime = moveStartTime ? (60 - timeLeft) : 0;
     
-    const isCapture = Math.abs(endRow - startRow) === 2;
-    if (isCapture) {
-        const midRow = (startRow + endRow) / 2;
-        const midCol = (startCol + endCol) / 2;
-        createCaptureEffect(midRow, midCol);
-    }
-    
     try {
         const response = await fetch('/move', {
             method: 'POST',
@@ -512,6 +512,12 @@ async function makeMove(startRow, startCol, endRow, endCol) {
         if (data.status === 'success') {
             const piece = gameState.board[startRow][startCol];
             const willPromote = (piece === P1 && endRow === 0) || (piece === P2 && endRow === 7);
+            
+            // CORREÇÃO: Usar posição da peça capturada do backend
+            // O backend retorna captured_pos na resposta
+            if (data.captured_pos) {
+                createCaptureEffect(data.captured_pos.row, data.captured_pos.col);
+            }
             
             gameState = data.game_state;
             clearSelection();

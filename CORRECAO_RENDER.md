@@ -48,3 +48,6 @@ Após o redeploy, verifique os logs:
 Os arquivos `Procfile` e `render.yaml` já estão corretos com `gunicorn dama:app`.
 O problema é que o Render pode ter uma configuração manual no dashboard que está sobrescrevendo.
 
+
+
+
