@@ -28,8 +28,9 @@ gunicorn==22.0.0      # Production server
 ```
 flask-socketio==5.5.1    # WebSocket support para Flask
 python-socketio==5.15.0  # Socket.IO Python client/server
-python-engineio==4.11.3  # Engine.IO transport layer
 eventlet==0.40.4         # Async networking library
+python-engineio          # Engine.IO (instalado automaticamente)
+dnspython                # DNS toolkit (instalado automaticamente)
 ```
 
 ### Utilidades
@@ -38,8 +39,9 @@ click==8.3.1             # CLI creation
 itsdangerous==2.2.0      # Cryptographic signing
 MarkupSafe==3.0.3        # String escaping
 blinker==1.9.0           # Signal/event system
-dnspython==2.7.0         # DNS toolkit (eventlet dependency)
 ```
+
+**Nota**: python-engineio e dnspython são dependências transitivas e serão instaladas automaticamente nas versões compatíveis.
 
 ## ✅ Compatibilidade Testada
 

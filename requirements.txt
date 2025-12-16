@@ -1,20 +1,26 @@
-# Flask e dependências core
+# ========================================
+# JOGO DE DAMAS - DEPENDÊNCIAS
+# Python 3.11.9 compatível
+# ========================================
+
+# Flask Framework
 Flask==3.1.2
 Werkzeug==3.1.4
+
+# Servidor Production (WSGI + Async)
+gunicorn==22.0.0
+eventlet==0.40.4
+
+# WebSocket Real-time
+flask-socketio==5.5.1
+python-socketio==5.15.0
+
+# Dependências Core (instaladas automaticamente, mas fixadas para estabilidade)
 click==8.3.1
 itsdangerous==2.2.0
 Jinja2==3.1.6
 MarkupSafe==3.0.3
 blinker==1.9.0
 
-# Servidor WSGI
-gunicorn==22.0.0
-
-# WebSocket e async
-flask-socketio==5.5.1
-python-socketio==5.15.0
-eventlet==0.40.4
-
-# Compatibilidade Python 3.11
-python-engineio==4.11.3
-dnspython==2.7.0
+# NOTA: python-engineio e dnspython são instalados automaticamente
+# como dependências transitivas de python-socketio e eventlet
