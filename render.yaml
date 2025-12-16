@@ -6,6 +6,7 @@ services:
     startCommand: gunicorn --worker-class eventlet -w 1 --timeout 300 --graceful-timeout 300 --keep-alive 5 --log-level info app:app
     envVars:
       - key: PYTHON_VERSION
-        value: 3.11.0
+        value: 3.11.9
       - key: PORT
         value: 10000
+    runtime: python

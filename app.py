@@ -27,11 +27,12 @@ socketio = SocketIO(
     async_mode='eventlet',
     ping_timeout=60,
     ping_interval=25,
-    logger=True,
+    logger=False,  # Desabilitar logs verbosos em produção
     engineio_logger=False,
     cookie=None,  # Não usar cookies (evita sessões inválidas)
     transports=['polling', 'websocket'],  # Polling primeiro, websocket depois
-    manage_session=False  # Flask-SocketIO gerencia sessões internamente
+    manage_session=False,  # Flask-SocketIO gerencia sessões internamente
+    always_connect=False  # Evitar reconexões automáticas problemáticas
 )
 
 # Gerenciador de salas multiplayer
