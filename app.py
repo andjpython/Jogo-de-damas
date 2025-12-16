@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 ========================================
 JOGO DE DAMA PROFISSIONAL - BACKEND
@@ -5,11 +6,11 @@ Desenvolvido com Flask
 ========================================
 """
 
+# CRÍTICO: monkey_patch DEVE ser a PRIMEIRA coisa antes de QUALQUER import
 import eventlet
-
-# Importante para habilitar WebSockets/long-polling corretamente com eventlet
 eventlet.monkey_patch()
 
+# Agora podemos importar o resto
 from flask import Flask, jsonify, request, render_template
 from flask_socketio import SocketIO, emit, join_room, leave_room
 import random
@@ -850,23 +851,30 @@ def handle_surrender():
 
 if __name__ == '__main__':
     import os
+    import sys
+    
+    # Configurar encoding UTF-8 para Windows
+    if sys.platform == 'win32':
+        import io
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+    
     port = int(os.environ.get('PORT', 5000))
     debug = os.environ.get('FLASK_ENV') == 'development'
     
-    print("🎮 Servidor MULTIPLAYER iniciando...")
-    print("📁 Estrutura do projeto:")
-    print("   ├── app.py (Backend + WebSocket)")
-    print("   ├── game_manager.py (Gerenciador de Salas)")
-    print("   ├── templates/")
-    print("   │   └── index.html")
-    print("   └── static/")
-    print("       ├── css/style.css")
-    print("       ├── js/game.js")
-    print("       └── imagens/")
-    print("           ├── peça_black_dama.jpg")
-    print("           └── peças_red_dama.jpg")
-    print(f"\n🚀 Servidor rodando na porta: {port}")
-    print("🌐 Modo MULTIPLAYER ativado!")
+    print("=" * 50)
+    print("[GAME] Servidor MULTIPLAYER iniciando...")
+    print("[INFO] Estrutura do projeto:")
+    print("   +-- app.py (Backend + WebSocket)")
+    print("   +-- game_manager.py (Gerenciador de Salas)")
+    print("   +-- templates/")
+    print("   |   +-- index.html")
+    print("   +-- static/")
+    print("       +-- css/style.css")
+    print("       +-- js/game.js")
+    print("       +-- imagens/")
+    print(f"[OK] Servidor rodando na porta: {port}")
+    print("[OK] Modo MULTIPLAYER ativado!")
     print("=" * 50)
     
     socketio.run(app, debug=debug, host='0.0.0.0', port=port, allow_unsafe_werkzeug=True)
