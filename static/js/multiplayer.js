@@ -14,11 +14,28 @@ let createRoomTimer = null;
 // ========================================
 
 function initSocket() {
-    if (socket) {
-        socket.disconnect();
+    if (socket && socket.connected) {
+        console.log('Socket já conectado, reutilizando...');
+        return; // Reutilizar conexão existente
     }
     
-    socket = io();
+    if (socket) {
+        socket.disconnect();
+        socket = null;
+    }
+    
+    // Configuração correta para Flask-SocketIO com eventlet no Render
+    socket = io({
+        transports: ['polling', 'websocket'], // Tentar polling primeiro, depois websocket
+        upgrade: true, // Fazer upgrade para websocket quando possível
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        reconnectionAttempts: 5,
+        timeout: 10000,
+        forceNew: false, // Reutilizar conexão quando possível
+        autoConnect: true
+    });
     
     socket.on('connect', () => {
         console.log('✅ Conectado ao servidor multiplayer!', socket.id);
