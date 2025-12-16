@@ -20,20 +20,13 @@ from game_manager import GameManager
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'dama-multiplayer-secret-key-2024'
 
-# Configuração SocketIO otimizada para produção (Render)
+# Configuração SocketIO SIMPLES e FUNCIONAL para produção
 socketio = SocketIO(
-    app, 
+    app,
     cors_allowed_origins="*",
-    cors_credentials=False,  # Evitar problemas de cookies no proxy
     async_mode='eventlet',
-    ping_timeout=60,
-    ping_interval=25,
-    logger=False,  # Desabilitar logs verbosos em produção
-    engineio_logger=False,
-    cookie=None,  # Não usar cookies (evita sessões inválidas)
-    transports=['polling', 'websocket'],  # Polling primeiro, websocket depois
-    manage_session=False,  # Flask-SocketIO gerencia sessões internamente
-    always_connect=False  # Evitar reconexões automáticas problemáticas
+    ping_timeout=120,
+    ping_interval=30
 )
 
 # Gerenciador de salas multiplayer

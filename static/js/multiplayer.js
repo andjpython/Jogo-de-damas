@@ -24,17 +24,12 @@ function initSocket() {
         socket = null;
     }
     
-    // Configuração correta para Flask-SocketIO com eventlet no Render
+    // Configuração SIMPLES para Flask-SocketIO
     socket = io({
-        transports: ['polling', 'websocket'], // Tentar polling primeiro, depois websocket
-        upgrade: true, // Fazer upgrade para websocket quando possível
         reconnection: true,
         reconnectionDelay: 1000,
-        reconnectionDelayMax: 5000,
-        reconnectionAttempts: 5,
-        timeout: 10000,
-        forceNew: false, // Reutilizar conexão quando possível
-        autoConnect: true
+        reconnectionAttempts: 10,
+        timeout: 20000
     });
     
     socket.on('connect', () => {
